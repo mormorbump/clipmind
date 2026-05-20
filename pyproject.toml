@@ -1,0 +1,105 @@
+[project]
+name = "clipmind"
+version = "0.1.0"
+description = "動画コンテンツを対話型で検索・質問できるマルチエージェントRAGシステム"
+authors = [
+    { name = "kazuki matsumoto", email = "mormorbump@gmail.com" }
+]
+requires-python = ">=3.11,<3.13"
+dependencies = [
+    "pydantic>=2.13.4",
+    "pydantic-settings>=2.14.1",
+]
+
+[project.scripts]
+clipmind = "clipmind:main"
+
+[build-system]
+requires = ["uv_build>=0.11.13,<0.12.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "bandit[toml]>=1.9.4",
+    "detect-secrets>=1.5.0",
+    "mypy>=2.1.0",
+    "pre-commit>=4.6.0",
+    "pytest>=9.0.3",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.15.12",
+]
+
+# ----------------------------------------------------------------------
+# Ruff: lint + format（Black 互換）
+# ----------------------------------------------------------------------
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = [".context", ".docker", "docs"]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "F",    # pyflakes
+    "I",    # isort
+    "N",    # pep8-naming
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+    "SIM",  # flake8-simplify
+    "RUF",  # ruff-specific
+]
+# 日本語ドキュメント・コメントを多用するため、全角文字の ambiguous 警告は無効化
+ignore = [
+    "RUF001",  # ambiguous-unicode-character-string
+    "RUF002",  # ambiguous-unicode-character-docstring
+    "RUF003",  # ambiguous-unicode-character-comment
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+# ----------------------------------------------------------------------
+# mypy: strict 型チェック
+# ----------------------------------------------------------------------
+[tool.mypy]
+python_version = "3.11"
+strict = true
+plugins = ["pydantic.mypy"]
+exclude = ["^\\.context/", "^\\.docker/", "^build/"]
+
+# 外部ライブラリで型情報がないものは Phase 0 では緩めない（必要になったら追加）
+[[tool.mypy.overrides]]
+module = []
+ignore_missing_imports = true
+
+# ----------------------------------------------------------------------
+# pytest
+# ----------------------------------------------------------------------
+[tool.pytest.ini_options]
+addopts = "-ra -q --strict-markers"
+testpaths = ["tests"]
+markers = [
+    "integration: requires external services (Qdrant, Redis, Postgres)",
+    "e2e: hits live LLM APIs (expensive, run manually)",
+]
+
+# ----------------------------------------------------------------------
+# coverage
+# ----------------------------------------------------------------------
+[tool.coverage.run]
+branch = true
+source = ["src/clipmind"]
+omit = ["tests/*"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+fail_under = 0   # Phase 0 はテスト無し。Phase 1 以降で 70+ に上げる
+
+# ----------------------------------------------------------------------
+# bandit: セキュリティ静的解析
+# ----------------------------------------------------------------------
+[tool.bandit]
+exclude_dirs = ["tests", ".venv", ".context", ".docker", "docs"]
+skips = []

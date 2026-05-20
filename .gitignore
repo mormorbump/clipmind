@@ -1,0 +1,46 @@
+# Secrets / local env
+.env
+.env.*
+!.env.example
+
+# Docker bind volumes（中身は揮発・誤コミット防止）
+.docker/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# uv / venv
+.venv/
+.python-version.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Logs / temp
+*.log
+*.pid
+.context/scratch/
+
+# Claude Code runtime state
+.claude/
