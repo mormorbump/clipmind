@@ -92,7 +92,11 @@
 1. baseline 破損: `uv run --quiet detect-secrets scan > .secrets.baseline` で再生成
 2. 並列干渉: `pkill -9 -f "docker pull|docker compose"` で全停止 → 1 つだけ実行で正常完了。
    → 教訓: **Bash tool で long-running を投げるなら 1 つだけ。再実行前に必ず ps で並走を確認**
-- 両方の罠を knowledge に罠として記録（`docs/knowledge/toolchain/01-uv-and-ruff.md` §4.3）
+3. **pytest exit code 5 で CI fail**: ローカル `uv run pytest` は「no tests ran」で OK に見えるが、
+   実は exit code 5 を返している。CI のシェルは `-e` 付きで non-zero を fail 扱いするため CI が落ちた。
+   → 解決: `tests/test_smoke.py` に最小の import smoke test を追加（package 構造の確認も兼ねる）
+
+- すべての罠を knowledge に記録（`docs/knowledge/toolchain/01-uv-and-ruff.md`）
 
 ### 数字・指標
 - Phase 0 工数: 実時間 約 1.5 時間（Plan 見積もり 5h より早かった）
@@ -123,7 +127,7 @@
 - [x] docker compose up -d --wait で **3 サービス healthy**（qdrant / redis / postgres）
 - [x] pre-commit run --all-files 全フック green
 - [x] .secrets.baseline コミット候補
-- [ ] CI green（push 後に確認、Phase 1 開始前まで）
+- [x] CI green（run #26141479315、31s、smoke test 追加で解消）
 - [x] ADR-0007 作成
 - [x] ADR-0001 文言修正
 - [x] adr/README.md 索引追加

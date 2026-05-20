@@ -240,3 +240,4 @@ docker-compose を CI で動かす必要がない。
 - 罠 2: 日本語コメント前提なら RUF001/002/003 を ignore しないと大量誤検知
 - 罠 3: `docker compose up` / `docker compose pull` を **同一イメージで複数並列**に投げると互いをロックして進捗ゼロ。
   「pull プロセスは生きているが output が空」という症状でハマる。`ps aux | grep "docker compose"` で並走数を確認、複数あれば `pkill -9 -f "docker compose"` で全停止 → 1 つだけ実行
+- 罠 4: **pytest の `no tests collected` は exit code 5**。ローカルで `uv run pytest` がメッセージ的に green に見えても、`echo $?` で確認すると 5。CI のシェルは `set -e` 付きで non-zero を fail 扱いするため落ちる。Phase 0 のような「テスト未実装フェーズ」でも、最小の smoke test（パッケージ import 確認）を 1 つ置いておくのが定石
