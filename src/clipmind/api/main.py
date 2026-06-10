@@ -44,11 +44,15 @@ def create_app() -> FastAPI:
 
     Instrumentator().instrument(app).expose(app, endpoint="/metrics", tags=["metrics"])
 
-    # Object Store 配下を /static で配信
+    # Object Store 配下を公開プレフィックス (既定 /static, 環境により /media 等) で配信
     settings = get_settings()
     static_dir = settings.object_store_dir
     static_dir.mkdir(parents=True, exist_ok=True)
-    app.mount("/static", StaticFiles(directory=Path(static_dir)), name="static")
+    app.mount(
+        settings.object_store_url_prefix,
+        StaticFiles(directory=Path(static_dir)),
+        name="object-store",
+    )
     return app
 
 

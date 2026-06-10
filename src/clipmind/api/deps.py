@@ -23,7 +23,10 @@ def get_settings() -> Settings:
 def get_object_store() -> ObjectStore:
     """ObjectStore シングルトン."""
     settings = get_settings()
-    return LocalFSObjectStore(base_dir=settings.object_store_dir)
+    return LocalFSObjectStore(
+        base_dir=settings.object_store_dir,
+        public_url_prefix=settings.object_store_url_prefix,
+    )
 
 
 @lru_cache(maxsize=1)
