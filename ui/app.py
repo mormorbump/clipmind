@@ -13,13 +13,19 @@ from typing import Any
 
 import streamlit as st
 
-from ui.api_client import ApiError, ClipMindClient, format_ms
+try:
+    from ui.api_client import ApiError, ClipMindClient, format_ms
+except ModuleNotFoundError:
+    # `streamlit run ui/app.py` ではプロジェクト root ではなく ui/ が sys.path に入るため
+    from api_client import ApiError, ClipMindClient, format_ms  # type: ignore[no-redef]
 
 st.set_page_config(
     page_title="ClipMind",
     page_icon="🎬",
     layout="wide",
-    initial_sidebar_state="expanded",
+    # "auto": モバイルでは折りたたむ. "expanded" 固定だと狭幅でサイドバーが
+    # コンテンツ全面を覆い、タブ操作をブロックする (実ブラウザ検証で発覚)
+    initial_sidebar_state="auto",
 )
 
 # ----------------------------------------------------------------------
@@ -38,11 +44,14 @@ with st.sidebar:
         health = client.health()
         deps: dict[str, str] = health.get("deps", {})
         ok = health.get("status") == "healthy"
-        st.success("API: healthy", icon="✅") if ok else st.warning("API: degraded", icon="⚠️")
-        cols = st.columns(4)
+        # 注意: 三項演算子で書くと式文になり、Streamlit の magic が戻り値の
+        # DeltaGenerator をサイドバーに描画してしまう. 必ず if 文で書く.
+        if ok:
+            st.success("API: healthy", icon="✅")
+        else:
+            st.warning("API: degraded", icon="⚠️")
         icon = {"ok": "🟢", "error": "🔴", "skipped": "⚪"}
-        for col, (name, state) in zip(cols, deps.items(), strict=False):
-            col.caption(f"{icon.get(state, '⚪')} {name}")
+        st.caption("  ".join(f"{icon.get(state, '⚪')} {name}" for name, state in deps.items()))
     except ApiError as e:
         st.error(f"API に接続できません\n\n{e}")
         st.stop()
