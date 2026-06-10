@@ -9,14 +9,17 @@ repos:
         args: [--fix]
       - id: ruff-format
 
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.18.2
+  # mypy は pre-commit の隔離環境では import を解決しきれないため
+  # ローカル + CI では `uv run mypy src` で実行する.
+  # pre-commit からは外し、push 前の手動 / CI に委ねる.
+  - repo: local
     hooks:
-      - id: mypy
-        additional_dependencies:
-          - pydantic
-          - pydantic-settings
-        args: [--strict, --config-file=pyproject.toml]
+      - id: mypy-uv
+        name: mypy (uv run)
+        entry: uv run mypy src
+        language: system
+        types: [python]
+        pass_filenames: false
         files: ^src/
 
   - repo: https://github.com/PyCQA/bandit

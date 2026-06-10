@@ -6,6 +6,9 @@
 # Docker bind volumes（中身は揮発・誤コミット防止）
 .docker/
 
+# Phase 1 ローカル永続データ（Object Store / Checkpointer DB / DB dump 等）
+.data/
+
 # Python
 __pycache__/
 *.py[cod]

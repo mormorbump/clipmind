@@ -7,8 +7,21 @@ authors = [
 ]
 requires-python = ">=3.11,<3.13"
 dependencies = [
+    "alembic>=1.13,<2",
+    "asyncpg>=0.30,<1",
+    "fastapi>=0.115,<0.116",
+    "faster-whisper>=1.1,<2",
+    "greenlet>=3",
+    "langgraph>=1.2,<2",
+    "langgraph-checkpoint-sqlite>=3.1,<4",
+    "numpy>=2,<3",
+    "opencv-python-headless>=4.10,<5",
     "pydantic>=2.13.4",
     "pydantic-settings>=2.14.1",
+    "python-multipart>=0.0.20",
+    "sqlalchemy[asyncio]>=2.0,<3",
+    "sqlmodel>=0.0.22,<1",
+    "uvicorn[standard]>=0.34,<0.35",
 ]
 
 [project.scripts]
@@ -20,11 +33,14 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
+    "anyio>=4.7,<5",
     "bandit[toml]>=1.9.4",
     "detect-secrets>=1.5.0",
+    "httpx>=0.28,<1",
     "mypy>=2.1.0",
     "pre-commit>=4.6.0",
     "pytest>=9.0.3",
+    "pytest-asyncio>=1.4,<2",
     "pytest-cov>=7.1.0",
     "ruff>=0.15.12",
 ]
@@ -68,9 +84,9 @@ strict = true
 plugins = ["pydantic.mypy"]
 exclude = ["^\\.context/", "^\\.docker/", "^build/"]
 
-# 外部ライブラリで型情報がないものは Phase 0 では緩めない（必要になったら追加）
+# 型 stub が無い外部ライブラリは個別に許可
 [[tool.mypy.overrides]]
-module = []
+module = ["faster_whisper"]
 ignore_missing_imports = true
 
 # ----------------------------------------------------------------------
@@ -79,6 +95,7 @@ ignore_missing_imports = true
 [tool.pytest.ini_options]
 addopts = "-ra -q --strict-markers"
 testpaths = ["tests"]
+asyncio_mode = "auto"
 markers = [
     "integration: requires external services (Qdrant, Redis, Postgres)",
     "e2e: hits live LLM APIs (expensive, run manually)",

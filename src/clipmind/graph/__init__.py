@@ -1,0 +1,1 @@
+"""LangGraph による Ingest パイプライン."""
