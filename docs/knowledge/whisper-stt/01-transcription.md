@@ -156,4 +156,13 @@ wer = jiwer.wer(reference, hypothesis)
 
 ## 実践マーカー
 
-- 未実装（Phase 1 で着手予定）
+- ✅ Phase 1 (M1-3) で実装完了（ローカル動作確認は ffmpeg 導入後）
+  - `src/clipmind/ingest/transcriber.py` の `transcribe()`
+  - macOS Apple Silicon 想定で `WhisperModel("base", device="cpu", compute_type="int8")`
+  - **VAD filter ON** で無音区間スキップ → ハルシネーション低減
+  - `no_speech_prob > 0.6` の segment は捨てる
+  - LangGraph ノード `make_transcribe_node(model_size)` で `asyncio.to_thread` 実行
+- ノード分割: architecture.md §3.2 に従い `extract_audio` と `transcribe` は **別ノード**
+  - Checkpointer の境界 = ノード境界。Whisper だけ落ちたら ffmpeg をやり直さずに resume
+- 型 stub 不在対策: `pyproject.toml` で `module = ["faster_whisper"]` に `ignore_missing_imports = true`
+- 罠: 初回 import 時にモデルダウンロード (~150MB for base)。実 Whisper を走らせるテストは `@pytest.mark.e2e` または `integration` で CI からスキップ運用

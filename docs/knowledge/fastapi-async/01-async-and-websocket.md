@@ -232,4 +232,13 @@ async def test_create_video():
 
 ## 実践マーカー
 
-- 未実装（Phase 1 で骨格、Phase 8 で本格化）
+- ✅ Phase 1 (M1-1 / M1-5) で骨格実装
+  - `src/clipmind/api/main.py` の `create_app()` ファクトリ + `lifespan` で `.data/` 初期化
+  - `GET /health`: Postgres `SELECT 1` ping、status `healthy` / `degraded` で表現。api-spec.md §2.11 と整合
+  - `POST /api/v1/videos`: multipart UploadFile → 64KiB chunk read で SHA256 streaming → ObjectStore.put → Postgres Video レコード作成 → LangGraph `run_ingest()` を同期実行 → 201
+  - `GET /api/v1/videos/{id}`: frame_count / transcript_segment_count を集計
+  - `app.mount("/static", StaticFiles(directory=...))` で ObjectStore 配下を配信
+- DI: `Depends(get_object_store)` / `Depends(get_settings)` / `Depends(_get_session_maker)` で wiring。テストでは `app.dependency_overrides` で差し替え
+- 罠: **Pydantic v2 の `Literal` フィールド** + mypy strict + 文字列 cast が相性悪い → `Response.model_validate({...})` でまとめて構築するほうが綺麗
+- 罠: `httpx.AsyncClient(transport=ASGITransport(app=app))` の API が 0.28 系で変わった。古い `AsyncClient(app=app)` は deprecated
+- 罠: `pytest-asyncio` 1.x はデフォルトで各テストごとに event loop を作る → asyncpg connection が前 loop に紐付くと爆発。autouse fixture で engine リセット (storage-sqlmodel/01 §5 参照)

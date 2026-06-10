@@ -194,4 +194,11 @@ for window in sliding_windows(start=0, end=duration, width=5_000, stride=5_000):
 
 ## 実践マーカー
 
-- 未実装（Phase 1 / 2 で着手予定）
+- ✅ Phase 1 (M1-2) で実践: **§1.1 自前ヒストグラム差分** を採用
+  - `src/clipmind/ingest/frames.py` の `extract_keyframes()`
+  - HSV ヒストグラム + `cv2.compareHist(..., HISTCMP_BHATTACHARYYA)` で類似度
+  - `threshold >= 0.4` かつ `min_gap_frames >= 5` でキーフレーム採用
+  - JPEG (quality 85) で encode
+  - LangGraph ノード `make_extract_frames_node(object_store)` で ObjectStore を closure、`asyncio.to_thread` で blocking 逃がし
+- **§1.2 PySceneDetect は不採用**: 学習価値（OpenCV API を直接触る）と依存追加回避を優先。チューニング難しくなったら Phase 2 以降で切替検討
+- テスト戦略: `cv2.VideoWriter` だけで合成動画 (5fps × 5 秒、赤→青) を fixture 化。ffmpeg なしで unit test 可能

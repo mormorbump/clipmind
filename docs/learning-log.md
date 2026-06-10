@@ -134,3 +134,72 @@
 - [x] knowledge toolchain/01-uv-and-ruff.md 執筆中以上
 - [x] knowledge/README.md にカテゴリ追加
 - [x] learning-log Phase 0 エントリ（本エントリ）
+
+---
+
+## 2026-06-10 — Phase 1 完了: MVP API + 動画解析
+
+### やったこと
+- ADR-0001 改訂（LangGraph `>=0.2,<0.3` → `>=1.2,<2`、最新安定版 1.2.4 採用）
+- ADR-0008 新規（ORM = SQLModel + SQLAlchemy 2.x async + asyncpg）
+- ADR-0009 新規（ObjectStore Protocol + LocalFSObjectStore）
+- M1-1: FastAPI app/lifespan + Pydantic v2 schemas + LangGraph 雛形 + ObjectStore Protocol + 静的配信
+- M1-4: SQLModel テーブル 3 つ (Video/Frame/TranscriptSegment) + Alembic init -t async + 初期 migration + VideoRepository async CRUD
+- M1-2: 自前ヒストグラム差分 (HSV + BHATTACHARYYA) でキーフレーム抽出 + LangGraph ノード化
+- M1-3: ffmpeg subprocess で 16kHz mono wav 抽出 + faster-whisper (base + int8 + VAD) + ノード分割 (extract_audio / transcribe)
+- M1-5: store ノード（State → Postgres）+ AsyncSqliteSaver Checkpointer + `run_ingest()` + API 統合
+- CI に Postgres services + alembic upgrade head step + pytest -m integration step を追加
+- knowledge 追記: langgraph / video-processing / whisper-stt / fastapi-async に「✅ Phase 1 で実践」マーカー
+- knowledge 新規: storage-sqlmodel/01-async-sqlmodel-alembic.md
+- /health に Postgres `SELECT 1` ping 実装、status="healthy"|"degraded"
+
+### 詰まった点
+1. **SQLModel autogenerate と script.py.mako の import 欠落**: autogenerate が `sqlmodel.sql.sqltypes.AutoString` を吐くのに `import sqlmodel` が無く `alembic upgrade head` で NameError. テンプレ修正 + 既存 migration 手修正の二段階対応
+2. **SQLModel + mypy strict の bool 誤推論**: `select(Video).where(Video.sha256 == x)` が `where(bool)` と推論される。SQLModel の `col()` ヘルパで吸収
+3. **LangGraph 1.x の型ナローイング不全**: `add_node(name, fn)` が `_Node[Never]` を期待してしまい、明示型付きの store ノードで mypy strict が落ちる。`# type: ignore[arg-type]` で凌いだ
+4. **pytest-asyncio 1.x + asyncpg の event loop 罠**: 各テストで独立した event loop が作られるが、asyncpg connection は作成時の loop に紐づく。autouse fixture で各テスト後に `dispose_engine()` して engine を作り直す対処
+5. **`docker compose pull` の並列干渉再発防止**: Phase 0 で記録済み
+
+### 解決策
+1. `alembic/script.py.mako` に `import sqlmodel  # noqa: F401` を追加 + 生成済み migration は手で追記
+2. `from sqlmodel import col, select` → `where(col(Model.field) == x)` で全面置換
+3. LangGraph 1.x の型情報が完成していない期間と認識、必要な箇所だけ局所的に `# type: ignore` を許容
+4. `tests/conftest.py` に autouse fixture `_reset_db_engine_per_test()` を配置
+
+### 数字・指標
+- Phase 1 工数: 実時間 約 3 時間（Plan 見積もり 5 〜 6 日に対して大幅短縮、ffmpeg/whisper の動作確認を含まないため）
+- 依存パッケージ追加: runtime +12 (fastapi/uvicorn/python-multipart/langgraph/checkpoint-sqlite/sqlmodel/sqlalchemy/asyncpg/alembic/greenlet/opencv-python-headless/numpy/faster-whisper)、dev +3 (pytest-asyncio/httpx/anyio)
+- テスト数: unit 10 + integration 4 + e2e 0、coverage は未測定（Phase 1 末で 70%目標へ）
+- migration ファイル: 1 つ (initial: video frame transcript)
+- LangGraph ノード: 5 (validate / extract_frames / extract_audio / transcribe / store)
+- Postgres テーブル: 3 (videos / frames / transcript_segments)
+
+### 学び
+- **SQLModel + Alembic async + mypy strict は罠が多い**: script.py.mako / `col()` ヘルパ / event loop fixture の三点が揃わないと CI で詰まる
+- **LangGraph の型情報はまだ発展途上**: `add_node` の型ナローイングは抑えるしかなく、`# type: ignore` で凌ぐのが現実解
+- **「ノード境界 = Checkpointer の境界」を意識**: extract_audio と transcribe を分割するのは、Whisper だけ落ちたときに ffmpeg をやり直さないため
+- **テストの分離戦略**: 拡張子バリデーションは unit、実 DB / 実 Ingest は integration、Whisper まで含めるのは e2e と marker で分離
+- **依存抽象化のコストはゼロに近い**: ObjectStore Protocol は Phase 1 時点では Path ラッパー相当だが、後で MinIO/S3 に切り替える際にコア処理を触らずに済む保険
+
+### 次アクション（Phase 2 引き継ぎ）
+- [ ] ffmpeg / faster-whisper のローカル動作確認（`brew install ffmpeg` + 実 30 秒音声で transcript 確認）
+- [ ] e2e テスト追加（30秒音声つき動画で frames + transcript が DB に揃う）
+- [ ] LangGraph に YOLO / マルチモーダル LLM ノードを並列追加 → Reducer の真価が出るタイミング
+- [ ] `LLMProvider` Protocol 設計（ADR-0003 既存）
+- [ ] coverage 70% 達成へ
+- [ ] Checkpointer の resume を Whisper kill 実験で確認（学習価値高）
+
+### Phase 1 DoD 達成状況
+- [x] `docker compose up -d --wait` で 3 サービス healthy（前提）
+- [x] `uv run uvicorn clipmind.api.main:app` で API 起動可能
+- [x] `/docs` で OpenAPI が見える（手元未確認だが routes は登録済み）
+- [x] `POST /api/v1/videos` 経路で動画 → frames（合成動画では transcript はスキップ）が Postgres
+- [x] `uv run pytest -m "not integration and not e2e"` が green (unit 10 passed)
+- [x] `uv run pytest -m "integration"` が green (4 passed, ffmpeg test skipped)
+- [ ] CI green（push 後に確認予定）
+- [x] ADR-0001 を最新の LangGraph バージョン (1.2.4) に合わせて改訂
+- [x] ADR-0008（ORM = SQLModel）作成
+- [x] ADR-0009（ObjectStore 抽象化）作成
+- [x] knowledge: langgraph / video-processing / whisper-stt / fastapi-async に「✅ Phase 1 で実践」マーカー追加
+- [x] knowledge: 新規 `storage-sqlmodel/01-async-sqlmodel-alembic.md` 執筆中以上
+- [x] learning-log に Phase 1 完了エントリ（本エントリ）
