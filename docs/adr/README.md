@@ -13,6 +13,8 @@
 | 0005 | [YouTube ダウンロードをサポートしない](0005-youtube-tos-policy.md) | Accepted |
 | 0006 | [評価戦略: Ragas + 自作データセット](0006-evaluation-strategy.md) | Accepted |
 | 0007 | [Python 3.11 + uv + ruff/mypy/pytest をツールチェーン標準](0007-toolchain.md) | Accepted |
+| 0008 | [ORM は SQLModel + SQLAlchemy 2.x async](0008-orm-sqlmodel.md) | Accepted |
+| 0009 | [ObjectStore Protocol で動画/フレーム保存を抽象化](0009-object-store-protocol.md) | Accepted |
 
 ## 書き方
 
