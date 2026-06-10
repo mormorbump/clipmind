@@ -45,6 +45,23 @@ class VideoRepository:
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
 
+    async def list_recent(self, limit: int = 50) -> list[Video]:
+        stmt = select(Video).order_by(col(Video.created_at).desc()).limit(limit)
+        result = await self.session.execute(stmt)
+        return list(result.scalars().all())
+
+    async def nearest_frame(self, video_id: UUID, timestamp_ms: int) -> Frame | None:
+        from sqlalchemy import func
+
+        stmt = (
+            select(Frame)
+            .where(col(Frame.video_id) == video_id)
+            .order_by(func.abs(col(Frame.timestamp_ms) - timestamp_ms))
+            .limit(1)
+        )
+        result = await self.session.execute(stmt)
+        return result.scalars().first()
+
     async def mark_completed(self, video_id: UUID) -> None:
         video = await self.get(video_id)
         if video is None:

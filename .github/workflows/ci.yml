@@ -39,6 +39,8 @@ jobs:
 
     env:
       DATABASE_URL: postgresql+asyncpg://clipmind:clipmind@localhost:5432/clipmind  # pragma: allowlist secret
+      # fastembed のモデルキャッシュ先を固定 (デフォルトは tmp 配下で actions/cache が効かない)
+      FASTEMBED_CACHE_PATH: /home/runner/.cache/fastembed
 
     steps:
       - uses: actions/checkout@v4
@@ -53,12 +55,15 @@ jobs:
       - name: Pin Python
         run: uv python install 3.11
 
-      # fastembed (bge-small / bm25) のモデルを CI 間でキャッシュ
-      - name: Cache fastembed models
+      # fastembed (bge-small / bm25) のモデルを CI 間でキャッシュ.
+      # FASTEMBED_CACHE_PATH と huggingface hub キャッシュの両方を保存する.
+      - name: Cache embedding models
         uses: actions/cache@v4
         with:
-          path: ~/.cache/huggingface
-          key: fastembed-models-v1
+          path: |
+            ~/.cache/huggingface
+            ~/.cache/fastembed
+          key: fastembed-models-v2
 
       - name: Sync deps
         run: uv sync --all-extras --dev
