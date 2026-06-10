@@ -198,4 +198,10 @@ query: "Q3 の結論は？"
 
 ## 実践マーカー
 
-- 未実装（Phase 3 で着手予定）
+- ✅ Phase 3 で実践
+  - **fuse**: `src/clipmind/rag/fuse.py` — 5 秒窓で transcript / detection / caption を束ねて検索単位 (TimelineSegment) を生成。窓境界をまたぐ transcript は両方の窓に入れる
+  - **dense**: `EmbeddingProvider` 抽象 (ADR-0010)。開発デフォルトは fastembed (bge-small-en-v1.5, 384 次元, ONNX, キー不要)、OpenAI キー投入で text-embedding-3-small に切替
+  - **sparse (BM25)**: fastembed の `Qdrant/bm25` で sparse vector を生成し、Qdrant の named sparse vector (IDF modifier) に格納
+  - **RRF 融合**: Qdrant Query API の `prefetch` + `FusionQuery(fusion=RRF)` で**サーバー側融合**。クライアントで RRF を自作する必要なし
+  - **rerank**: `Reranker` Protocol + `CrossEncoderReranker` (fastembed TextCrossEncoder, ローカル)。デフォルト off (設定 `enable_rerank`)。Cohere はキー投入後の選択肢
+- 検証済み (integration test): 意味検索 ("financial results presentation" → revenue セグメント)、キーワード混合 ("cat playing")、video_id フィルタ、決定的 point id (uuid5) による再 index 上書き

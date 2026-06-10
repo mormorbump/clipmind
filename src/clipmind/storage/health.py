@@ -19,3 +19,16 @@ async def postgres_ping() -> bool:
         return True
     except Exception:
         return False
+
+
+async def qdrant_ping(qdrant_url: str) -> bool:
+    """Qdrant の collection 一覧 API を叩いて成功すれば True."""
+    try:
+        from qdrant_client import AsyncQdrantClient
+
+        client = AsyncQdrantClient(url=qdrant_url, timeout=3)
+        await client.get_collections()
+        await client.close()
+        return True
+    except Exception:
+        return False

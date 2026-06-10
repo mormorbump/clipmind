@@ -190,4 +190,11 @@ OpenAI `text-embedding-3-small` は L2 正規化済みなので、Cosine == Dot 
 
 ## 実践マーカー
 
-- 未実装（Phase 3 で着手予定）
+- ✅ Phase 3 で実践 (`src/clipmind/rag/indexer.py`)
+  - **named vectors**: 1 コレクションに dense ("dense") + sparse ("bm25") を同居
+  - **sparse は IDF modifier 必須**: `SparseVectorParams(modifier=Modifier.IDF)` を忘れると BM25 スコアが正しく計算されない
+  - **コレクション名にモデルタグ**: `segments__fastembed_bge_small_en_v1_5` のように embedding モデルを刻み、ベクトル空間の混在を構造的に防止 (ADR-0010)
+  - **決定的 point ID**: `uuid5(namespace, f"{video_id}:{start_ms}")` で再 Ingest 時に同じ窓を上書き。重複が増えない
+  - **Query API**: `query_points(prefetch=[dense, sparse], query=FusionQuery(RRF))` でハイブリッド検索をサーバー側 1 リクエストで完結
+  - **payload フィルタ**: `FieldCondition(key="video_id", match=...)` を prefetch 両方に適用（fusion 後のフィルタでは prefetch 件数が無駄になる）
+- 罠: `AsyncQdrantClient` を閉じ忘れるとテストで event loop 警告。テストでは finally で `close()`

@@ -47,6 +47,12 @@ class Settings(BaseSettings):
         default="claude-haiku-4-5", description="キャプション フォールバックモデル"
     )
 
+    # RAG (Phase 3)
+    enable_indexing: bool = Field(default=True, description="Qdrant への segment インデックス")
+    enable_rerank: bool = Field(
+        default=False, description="CrossEncoder 再ランク (モデルダウンロードが走るため既定 off)"
+    )
+
     # Phase 1: ローカル開発の永続データ配置先（.gitignore 済み）
     data_dir: Path = Field(
         default=Path(".data"), description="ローカル開発で使う永続データの基準ディレクトリ"

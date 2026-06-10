@@ -24,3 +24,11 @@ def get_object_store() -> ObjectStore:
     """ObjectStore シングルトン."""
     settings = get_settings()
     return LocalFSObjectStore(base_dir=settings.object_store_dir)
+
+
+@lru_cache(maxsize=1)
+def get_segment_index():  # type: ignore[no-untyped-def]  # 戻り値は SegmentIndex (循環 import 回避で遅延)
+    """SegmentIndex シングルトン."""
+    from clipmind.rag.factory import build_segment_index
+
+    return build_segment_index(get_settings())

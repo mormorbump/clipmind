@@ -21,6 +21,7 @@ from clipmind.graph.nodes.caption_frames import make_caption_frames_node
 from clipmind.graph.nodes.detect_objects import make_detect_objects_node
 from clipmind.graph.nodes.extract_audio import make_extract_audio_node
 from clipmind.graph.nodes.extract_frames import make_extract_frames_node
+from clipmind.graph.nodes.index_segments import make_index_segments_node
 from clipmind.graph.nodes.store import make_store_node
 from clipmind.graph.nodes.transcribe import make_transcribe_node
 from clipmind.graph.nodes.validate import validate_input
@@ -30,6 +31,7 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
     from clipmind.llm.captioner import Captioner
+    from clipmind.rag.indexer import SegmentIndex
     from clipmind.storage.object_store import ObjectStore
 
 
@@ -51,16 +53,18 @@ def build_ingest_graph(
     audio_dir: Path,
     session_maker: async_sessionmaker[AsyncSession],
     captioner: Captioner,
+    segment_index: SegmentIndex | None = None,
     whisper_model_size: str = "base",
     enable_detection: bool = True,
     max_caption_frames: int | None = 20,
 ) -> StateGraph[IngestState, None, IngestState, IngestState]:
-    """Phase 2 の fan-out 付き Ingest グラフを返す (compile 前).
+    """fan-out 付き Ingest グラフを返す (compile 前).
 
     `store` の `# type: ignore[arg-type]` は LangGraph 1.2 の `add_node` が
     `_Node[Never]` を期待する型ナローイング問題への対処. ランタイム挙動には影響しない.
 
     Args:
+        segment_index: None なら Qdrant インデックス (index ノード) を外す
         enable_detection: False なら YOLO 経路を外す (テスト高速化用)
         max_caption_frames: キャプション対象フレーム数の上限 (コスト制御)
     """
@@ -91,5 +95,12 @@ def build_ingest_graph(
 
     # fan-in: 全経路の完了を待って store
     graph.add_edge(fan_in, "store")
-    graph.add_edge("store", END)
+
+    # Phase 3: store の後に Qdrant へ segment インデックス
+    if segment_index is not None:
+        graph.add_node("index", make_index_segments_node(segment_index))
+        graph.add_edge("store", "index")
+        graph.add_edge("index", END)
+    else:
+        graph.add_edge("store", END)
     return graph
