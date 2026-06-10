@@ -1,0 +1,20 @@
+# リポジトリオーナー自身の PR に preview ラベルを自動付与する。
+# k8s-action 側の ApplicationSet がこのラベルを見てプレビュー環境を生成する。
+# フォークからの第三者 PR は自動付与されない（オーナーの手動ラベルが必要）。
+name: auto-preview-label
+
+on:
+  pull_request_target:
+    types: [opened, reopened]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  add-label:
+    if: github.event.pull_request.author_association == 'OWNER'
+    runs-on: ubuntu-latest
+    steps:
+      - run: gh pr edit ${{ github.event.pull_request.number }} --repo ${{ github.repository }} --add-label preview
+        env:
+          GH_TOKEN: ${{ github.token }}

@@ -1,0 +1,9 @@
+.git
+.docker
+.venv
+**/__pycache__
+*.pyc
+tests/
+eval/
+docs/
+.env
