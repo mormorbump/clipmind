@@ -1,0 +1,4 @@
+# ClipMind 評価データセット (例). 実データは動画 Ingest 後に video_id を差し替えて作成する.
+# relevant_start_ms は「正解 segment 窓の start_ms」(5 秒窓に合わせて 5000 の倍数).
+{"query": "When does the presenter show the quarterly results?", "video_id": "00000000-0000-0000-0000-000000000001", "relevant_start_ms": [315000, 320000]}
+{"query": "Scenes with a laptop on the desk", "video_id": "00000000-0000-0000-0000-000000000001", "relevant_start_ms": [10000]}

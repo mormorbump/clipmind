@@ -210,4 +210,12 @@ PR 時:
 
 ## 実践マーカー
 
-- 未実装（Phase 4 で着手予定）
+- ✅ Phase 4 で実践 (Layer 1: Retrieval 評価)
+  - `src/clipmind/eval/metrics.py`: Recall@k / MRR / nDCG@k を純関数で実装 (手計算と一致する unit test 付き)
+  - `src/clipmind/eval/dataset.py`: JSONL 形式の評価データセット (`query` / `video_id` / `relevant_start_ms`)
+  - `src/clipmind/eval/runner.py`: dense / hybrid 両モードで一括評価 → Markdown レポート生成
+  - CLI: `uv run python -m clipmind.eval.runner --dataset eval/dataset.jsonl`
+  - 正解ラベルは「segment 窓の start_ms」で表す (5 秒窓なので 5000 の倍数)
+- ⏸ Layer 2/3 (Ragas / LLM-as-judge) は **LLM API キー投入待ち**。キー投入後に
+  `ragas` 依存追加 + 評価データセット 50 クエリの人手作成から再開する
+- 実データセット作成は動画 Ingest 後の作業 (`eval/dataset.example.jsonl` が形式の見本)
