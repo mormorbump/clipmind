@@ -1,0 +1,18 @@
+# Streamlit UI 用の軽量イメージ。
+# ui/ は clipmind パッケージに依存せず httpx で API を呼ぶだけなので、
+# ML 系依存を含む API イメージ (Dockerfile) とは分離して数百 MB に抑える。
+FROM python:3.12-slim
+
+# バージョン範囲は pyproject.toml の [dependency-groups].ui と揃える
+RUN pip install --no-cache-dir "streamlit>=1.41,<2" "httpx>=0.28,<1"
+
+WORKDIR /app
+COPY ui/ ui/
+
+EXPOSE 8501
+# headless: ブラウザ自動起動なし。XSRF はリバースプロキシ (Istio) 配下のため無効化
+CMD ["streamlit", "run", "ui/app.py", \
+     "--server.port=8501", \
+     "--server.address=0.0.0.0", \
+     "--server.headless=true", \
+     "--server.enableXsrfProtection=false"]

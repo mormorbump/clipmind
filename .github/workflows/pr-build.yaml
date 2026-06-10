@@ -1,6 +1,6 @@
 # PR プレビュー用イメージビルド。
 # k8s-action（プラットフォームリポジトリ）の ApplicationSet が
-# head SHA タグでこのイメージを preview 環境にデプロイする。
+# head SHA タグでこれらのイメージを preview 環境にデプロイする。
 # 仕組み: https://github.com/mormorbump/k8s-action
 name: pr-build
 
@@ -11,6 +11,7 @@ on:
 permissions:
   contents: read
   id-token: write
+  pull-requests: write # プレビュー URL のコメント投稿に必要
 
 concurrency:
   group: pr-build-${{ github.event.pull_request.number }}
@@ -27,6 +28,13 @@ jobs:
       github.event.pull_request.author_association == 'OWNER' ||
       contains(github.event.pull_request.labels.*.name, 'preview')
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - image: clipmind # API (FastAPI)
+            dockerfile: Dockerfile
+          - image: clipmind-ui # Web UI (Streamlit)
+            dockerfile: Dockerfile.ui
     steps:
       - uses: actions/checkout@v4
 
@@ -41,8 +49,39 @@ jobs:
       - name: Configure docker for GAR
         run: gcloud auth configure-docker ${{ env.GAR_LOCATION }}-docker.pkg.dev --quiet
 
-      - name: Build and push clipmind
+      - name: Build and push ${{ matrix.image }}
         run: |
-          IMAGE="$GAR_REPO/clipmind:${{ github.event.pull_request.head.sha }}"
-          docker build -t "$IMAGE" .
+          IMAGE="$GAR_REPO/${{ matrix.image }}:${{ github.event.pull_request.head.sha }}"
+          docker build -f ${{ matrix.dockerfile }} -t "$IMAGE" .
           docker push "$IMAGE"
+
+  # プレビュー URL を PR にコメントする（初回のみ。マーカーで重複防止）。
+  # フォーク PR は GITHUB_TOKEN が read-only のためスキップされる。
+  comment-preview-url:
+    needs: build-push
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Comment preview URL (once)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          MARKER="<!-- preview-url -->"
+          if gh pr view "$PR" --repo "$GITHUB_REPOSITORY" --json comments -q '.comments[].body' | grep -qF "$MARKER"; then
+            echo "comment already exists, skip"
+            exit 0
+          fi
+          BASE="http://pr-${PR}.clipmind.104.154.128.86.nip.io"
+          gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body "$MARKER
+          ## 🚀 プレビュー環境
+
+          | | URL |
+          |---|---|
+          | Web UI | ${BASE}/ |
+          | API ドキュメント (Swagger UI) | ${BASE}/docs |
+          | ヘルスチェック | ${BASE}/health |
+
+          - 環境の生成まで **最大5分**（Argo CD のポーリング間隔）+ イメージ pull 時間がかかります
+          - push のたびに head SHA のイメージで自動更新されます
+          - PR クローズで自動削除されます"

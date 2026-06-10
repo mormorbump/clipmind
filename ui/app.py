@@ -13,7 +13,13 @@ from typing import Any
 
 import streamlit as st
 
-from ui.api_client import ApiError, ClipMindClient, format_ms
+from ui.api_client import (
+    DEFAULT_BASE_URL,
+    PUBLIC_BASE_URL,
+    ApiError,
+    ClipMindClient,
+    format_ms,
+)
 
 st.set_page_config(
     page_title="ClipMind",
@@ -30,7 +36,7 @@ with st.sidebar:
     st.title("🎬 ClipMind")
     st.caption("動画を取り込み、自然言語で検索・質問する")
 
-    api_base = st.text_input("API URL", value="http://localhost:8000")
+    api_base = st.text_input("API URL", value=DEFAULT_BASE_URL)
     client = ClipMindClient(api_base)
 
     # ヘルス: データの信頼性シグナルを常時表示
@@ -78,11 +84,15 @@ with st.sidebar:
 
 
 def _frame_url(video_id: str, start_ms: int) -> str | None:
-    """検索ヒットの時刻に最も近いキーフレーム URL (静的配信のフルパス)."""
+    """検索ヒットの時刻に最も近いキーフレーム URL (静的配信のフルパス).
+
+    <img src> としてブラウザが解決する URL なので、サーバサイド用の
+    client.base_url ではなく外部公開用の PUBLIC_BASE_URL を使う.
+    """
     frame = client.get_nearest_frame(video_id, start_ms)
     if frame is None:
         return None
-    return f"{client.base_url}{frame['frame_url']}"
+    return f"{PUBLIC_BASE_URL}{frame['frame_url']}"
 
 
 # ----------------------------------------------------------------------
