@@ -9,7 +9,6 @@ jobs:
   lint-and-test:
     runs-on: ubuntu-latest
 
-    # Phase 0: Qdrant + Redis のみ。Postgres は Phase 1 (alembic 導入時) に追加。
     services:
       qdrant:
         image: qdrant/qdrant:v1.12.1
@@ -24,6 +23,22 @@ jobs:
           --health-interval 5s
           --health-timeout 3s
           --health-retries 10
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: clipmind  # pragma: allowlist secret
+          POSTGRES_PASSWORD: clipmind  # pragma: allowlist secret
+          POSTGRES_DB: clipmind
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U clipmind -d clipmind"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql+asyncpg://clipmind:clipmind@localhost:5432/clipmind  # pragma: allowlist secret
 
     steps:
       - uses: actions/checkout@v4
@@ -50,5 +65,11 @@ jobs:
       - name: Mypy strict
         run: uv run mypy src
 
-      - name: Pytest (unit only)
+      - name: Alembic migrate
+        run: uv run alembic upgrade head
+
+      - name: Pytest (unit)
         run: uv run pytest -m "not integration and not e2e"
+
+      - name: Pytest (integration)
+        run: uv run pytest -m integration

@@ -1,8 +1,9 @@
-"""環境変数ベースの設定。
+"""環境変数ベースの設定.
 
-Pydantic Settings で .env / 環境変数を読み込み、型安全に提供する。
-Phase 0 では雛形のみ。Phase 1 以降でフィールドを追加する。
+Pydantic Settings で .env / 環境変数を読み込み、型安全に提供する.
 """
+
+from pathlib import Path
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -30,10 +31,32 @@ class Settings(BaseSettings):
         description="Postgres async URL",
     )
 
-    # 観測性（任意）
+    # 観測性
     langsmith_api_key: str = Field(default="", description="LangSmith API key")
     langsmith_tracing: bool = Field(default=False, description="Enable LangSmith tracing")
     langsmith_project: str = Field(default="clipmind", description="LangSmith project name")
+
+    # Phase 1: ローカル開発の永続データ配置先（.gitignore 済み）
+    data_dir: Path = Field(
+        default=Path(".data"), description="ローカル開発で使う永続データの基準ディレクトリ"
+    )
+    object_store_subdir: str = Field(
+        default="objects", description="data_dir 配下の Object Store サブディレクトリ"
+    )
+    checkpoint_db_subpath: str = Field(
+        default="checkpoints/ingest.db",
+        description="data_dir 配下の LangGraph SQLite Checkpointer ファイル",
+    )
+
+    @property
+    def object_store_dir(self) -> Path:
+        """LocalFSObjectStore のルートディレクトリ."""
+        return self.data_dir / self.object_store_subdir
+
+    @property
+    def checkpoint_db_path(self) -> Path:
+        """LangGraph SQLite Checkpointer ファイルパス."""
+        return self.data_dir / self.checkpoint_db_subpath
 
 
 def get_settings() -> Settings:

@@ -233,4 +233,13 @@ graph = graph.compile(checkpointer=SqliteSaver.from_conn_string("checkpoints.db"
 
 ## 実践マーカー
 
-- 未実装（Phase 1 で着手予定）
+- ✅ Phase 1 で実践
+  - **State**: `IngestState`（TypedDict + Annotated[list, add] reducer）を `src/clipmind/graph/state.py` に定義
+  - **ノード**: validate / extract_frames / extract_audio / transcribe / store の 5 つ
+  - **直列パス**: Phase 1 では並列ノード無し（YAGNI、Phase 2 で YOLO/Caption が並列追加されると Reducer が活きる）
+  - **Checkpointer**: `AsyncSqliteSaver.from_conn_string(.data/checkpoints/ingest.db)` を `async with` 内で構築 → `compile(checkpointer=...)`
+- **罠 1 — LangGraph 1.x の型ナローイング不全**: `StateGraph[IngestState, ...].add_node(name, fn)` が `_Node[Never]` を期待してしまい、mypy strict で `Callable[[IngestState], Awaitable[IngestState]]` が通らない。`# type: ignore[arg-type]` で凌いだ。
+  プレーンな関数（型注釈ありの validate 等）は通るが、明示的に型付けしたファクトリ関数の戻り値は落ちる。
+- **罠 2 — `ainvoke(initial_state, config={...})` の overload 不一致**: LangGraph 1.2 の `Pregel.ainvoke` は overload が複雑で `config=dict` のキーワード推論が効きづらい。`# type: ignore[call-overload]` で凌いだ。
+- **罠 3 — TypedDict + Annotated[list, add] 初期化**: 空 list を `[]` で渡すと `list[Never]` 推論で TypedDict 構築時に型エラー。`cast("list[Frame]", [])` 等で明示。
+- 学び: **LangGraph の型サポートはまだ発展途上**。strict mypy では `# type: ignore` を一定許容するか、内部で `Any` を経由するヘルパで吸収する戦略が必要。
