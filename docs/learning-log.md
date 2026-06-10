@@ -257,3 +257,24 @@
 - [ ] Ragas + LLM-as-judge (Phase 4 残)
 - [ ] 実動画 10 本 + 50 クエリの評価データセット → Recall@5 ≥ 0.7
 - [ ] LangSmith トレース有効化 (LANGSMITH_API_KEY)
+
+---
+
+## 2026-06-10 — Streamlit UI 追加 (Phase 9 仕上げ)
+
+### やったこと
+- `ui/app.py`: サイドバー (API ヘルス + 動画セレクタ) + 3 タブ (取り込み / 検索 / 質問)
+- UI 用補助 API: `GET /videos` (一覧)、`GET /videos/{id}/progress` (Redis 最新イベントのポーリング)、`GET /videos/{id}/frame` (時刻に最も近いキーフレーム)
+- streamlit は dependency-group `ui` に分離。起動は `uv run --group ui streamlit run ui/app.py`
+
+### 詰まった点
+- **CI で fastembed のモデルダウンロードが失敗** (`Could not load model BAAI/bge-small-en-v1.5 from any source`)。
+  原因は 2 段: (1) HF Hub の取得が CI ランナーで不安定 (レート制限/ネットワーク)、
+  (2) actions/cache で `~/.cache/huggingface` を保存していたが、**fastembed のデフォルトキャッシュは tmp 配下**で
+  キャッシュが全く効いていなかった
+- 解決: `FASTEMBED_CACHE_PATH` を固定し、huggingface / fastembed 両方のパスを actions/cache に登録
+
+### 学び
+- ライブラリの「モデルキャッシュのデフォルトパス」は要確認。actions/cache のパス指定が外れていると
+  green が続いていても**毎回ダウンロードしていて、外部サービスの不調で突然落ちる**
+
