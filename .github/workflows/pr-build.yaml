@@ -11,6 +11,7 @@ on:
 permissions:
   contents: read
   id-token: write
+  pull-requests: write # プレビュー URL のコメント投稿に必要
 
 concurrency:
   group: pr-build-${{ github.event.pull_request.number }}
@@ -46,3 +47,33 @@ jobs:
           IMAGE="$GAR_REPO/clipmind:${{ github.event.pull_request.head.sha }}"
           docker build -t "$IMAGE" .
           docker push "$IMAGE"
+
+  # プレビュー URL を PR にコメントする（初回のみ。マーカーで重複防止）。
+  # フォーク PR は GITHUB_TOKEN が read-only のためスキップされる。
+  comment-preview-url:
+    needs: build-push
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Comment preview URL (once)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          MARKER="<!-- preview-url -->"
+          if gh pr view "$PR" --repo "$GITHUB_REPOSITORY" --json comments -q '.comments[].body' | grep -qF "$MARKER"; then
+            echo "comment already exists, skip"
+            exit 0
+          fi
+          BASE="http://pr-${PR}.clipmind.104.154.128.86.nip.io"
+          gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body "$MARKER
+          ## 🚀 プレビュー環境
+
+          | | URL |
+          |---|---|
+          | ヘルスチェック | ${BASE}/health |
+          | API ドキュメント (Swagger UI) | ${BASE}/docs |
+
+          - 環境の生成まで **最大5分**（Argo CD のポーリング間隔）+ イメージ pull 時間がかかります
+          - push のたびに head SHA のイメージで自動更新されます
+          - PR クローズで自動削除されます"
