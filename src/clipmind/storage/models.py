@@ -60,3 +60,37 @@ class TranscriptSegment(SQLModel, table=True):
     start_ms: int
     end_ms: int
     text: str
+
+
+class Detection(SQLModel, table=True):
+    """YOLO 物体検知 1 件 (Phase 2)."""
+
+    __tablename__ = "detections"
+    __table_args__ = (Index("ix_detections_video_frame", "video_id", "frame_index"),)
+
+    id: UUID = Field(default_factory=uuid4, primary_key=True)
+    video_id: UUID = Field(
+        sa_column=Column(ForeignKey("videos.id", ondelete="CASCADE"), nullable=False, index=True)
+    )
+    frame_index: int
+    label: str = Field(max_length=64, index=True)
+    confidence: float
+    bbox_x1: int
+    bbox_y1: int
+    bbox_x2: int
+    bbox_y2: int
+
+
+class FrameCaption(SQLModel, table=True):
+    """マルチモーダル LLM のフレームキャプション 1 件 (Phase 2)."""
+
+    __tablename__ = "frame_captions"
+    __table_args__ = (Index("ix_captions_video_frame", "video_id", "frame_index"),)
+
+    id: UUID = Field(default_factory=uuid4, primary_key=True)
+    video_id: UUID = Field(
+        sa_column=Column(ForeignKey("videos.id", ondelete="CASCADE"), nullable=False, index=True)
+    )
+    frame_index: int
+    text: str
+    model: str = Field(max_length=64)

@@ -35,4 +35,5 @@ repos:
     hooks:
       - id: detect-secrets
         args: ["--baseline", ".secrets.baseline"]
-        exclude: ^(\.context/|docs/|uv\.lock|\.secrets\.baseline)
+        # alembic/versions: revision id の hex がエントロピー検知に誤検知されるため除外
+        exclude: ^(\.context/|docs/|uv\.lock|\.secrets\.baseline|alembic/versions/)

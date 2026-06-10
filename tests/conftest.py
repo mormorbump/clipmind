@@ -28,6 +28,112 @@ async def _reset_db_engine_per_test() -> AsyncIterator[None]:
 
 
 @pytest.fixture
+def synthetic_video_with_audio(tmp_path: Path) -> Iterator[Path]:
+    """ffmpeg の lavfi で「赤→青 + 440Hz サイン波音声」の 5 秒 mp4 を生成する.
+
+    ffmpeg 必須なので integration テスト用.
+    """
+    import shutil
+    import subprocess
+
+    if shutil.which("ffmpeg") is None:
+        pytest.skip("ffmpeg not installed")
+
+    out_path = tmp_path / "synthetic_with_audio_5s.mp4"
+    cmd = [
+        "ffmpeg",
+        "-y",
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-f",
+        "lavfi",
+        "-i",
+        "color=c=red:size=64x64:duration=2.5:rate=5",
+        "-f",
+        "lavfi",
+        "-i",
+        "color=c=blue:size=64x64:duration=2.5:rate=5",
+        "-f",
+        "lavfi",
+        "-i",
+        "sine=frequency=440:duration=5",
+        "-filter_complex",
+        "[0:v][1:v]concat=n=2:v=1:a=0[v]",
+        "-map",
+        "[v]",
+        "-map",
+        "2:a",
+        "-c:v",
+        "libx264",
+        "-pix_fmt",
+        "yuv420p",
+        "-c:a",
+        "aac",
+        str(out_path),
+    ]
+    subprocess.run(cmd, check=True, capture_output=True)
+    assert out_path.exists() and out_path.stat().st_size > 0
+    yield out_path
+
+
+@pytest.fixture
+def spoken_video(tmp_path: Path) -> Iterator[Path]:
+    """macOS `say` で実音声 (英語) を合成し、動画に mux した 30 秒弱の mp4.
+
+    Whisper の transcript 確認 (e2e) 用. macOS + ffmpeg 必須.
+    """
+    import platform
+    import shutil
+    import subprocess
+
+    if platform.system() != "Darwin":
+        pytest.skip("spoken_video fixture requires macOS `say`")
+    if shutil.which("ffmpeg") is None or shutil.which("say") is None:
+        pytest.skip("ffmpeg / say not installed")
+
+    aiff = tmp_path / "speech.aiff"
+    text = (
+        "Welcome to the quarterly review. "
+        "Today we will discuss the third quarter results. "
+        "Revenue increased by twenty percent compared to last year. "
+        "The new product line exceeded all expectations. "
+        "Thank you for joining this presentation."
+    )
+    subprocess.run(["say", "-o", str(aiff), text], check=True, capture_output=True)
+
+    out_path = tmp_path / "spoken_video.mp4"
+    cmd = [
+        "ffmpeg",
+        "-y",
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-i",
+        str(aiff),
+        "-f",
+        "lavfi",
+        "-i",
+        "color=c=darkgreen:size=64x64:rate=5",
+        "-shortest",
+        "-map",
+        "1:v",
+        "-map",
+        "0:a",
+        "-c:v",
+        "libx264",
+        "-pix_fmt",
+        "yuv420p",
+        "-c:a",
+        "aac",
+        str(out_path),
+    ]
+    subprocess.run(cmd, check=True, capture_output=True)
+    assert out_path.exists() and out_path.stat().st_size > 0
+    yield out_path
+
+
+@pytest.fixture
 def synthetic_video(tmp_path: Path) -> Iterator[Path]:
     """色が途中で変わる 5 秒動画を OpenCV だけで生成して返す (ffmpeg 不要).
 

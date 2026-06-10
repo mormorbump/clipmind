@@ -12,7 +12,7 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from clipmind.graph.state import IngestState
-from clipmind.storage.models import Frame, TranscriptSegment
+from clipmind.storage.models import Detection, Frame, FrameCaption, TranscriptSegment
 from clipmind.storage.repositories.video import VideoRepository
 
 
@@ -49,6 +49,28 @@ def make_store_node(
             )
             for s in state.get("transcripts", [])
         ]
+        detection_models: list[Detection] = [
+            Detection(
+                video_id=video_uuid,
+                frame_index=d["frame_index"],
+                label=d["label"],
+                confidence=d["confidence"],
+                bbox_x1=d["bbox"][0],
+                bbox_y1=d["bbox"][1],
+                bbox_x2=d["bbox"][2],
+                bbox_y2=d["bbox"][3],
+            )
+            for d in state.get("detections", [])
+        ]
+        caption_models: list[FrameCaption] = [
+            FrameCaption(
+                video_id=video_uuid,
+                frame_index=c["frame_index"],
+                text=c["text"],
+                model=c["model"],
+            )
+            for c in state.get("captions", [])
+        ]
 
         async with session_maker() as session:
             repo = VideoRepository(session)
@@ -56,6 +78,12 @@ def make_store_node(
                 await repo.add_frames(frame_models)
             if seg_models:
                 await repo.add_transcript_segments(seg_models)
+            if detection_models:
+                session.add_all(detection_models)
+                await session.commit()
+            if caption_models:
+                session.add_all(caption_models)
+                await session.commit()
             await repo.mark_completed(video_uuid)
 
         return {}

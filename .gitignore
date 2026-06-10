@@ -47,3 +47,6 @@ dist/
 
 # Claude Code runtime state
 .claude/
+
+# ML モデル重み（初回実行時に自動ダウンロード）
+*.pt

@@ -26,6 +26,23 @@ class TranscriptSegment(TypedDict):
     text: str
 
 
+class DetectionRecord(TypedDict):
+    """YOLO 検知結果 1 件."""
+
+    frame_index: int
+    label: str
+    confidence: float
+    bbox: tuple[int, int, int, int]
+
+
+class Caption(TypedDict):
+    """フレームキャプション 1 件."""
+
+    frame_index: int
+    text: str
+    model: str
+
+
 class IngestState(TypedDict, total=False):
     """LangGraph で流れる State.
 
@@ -40,4 +57,6 @@ class IngestState(TypedDict, total=False):
 
     frames: Annotated[list[Frame], add]
     transcripts: Annotated[list[TranscriptSegment], add]
+    detections: Annotated[list[DetectionRecord], add]
+    captions: Annotated[list[Caption], add]
     errors: Annotated[list[str], add]
