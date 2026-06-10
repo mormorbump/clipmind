@@ -47,6 +47,7 @@ st.set_page_config(
 with st.sidebar:
     st.title("🎬 ClipMind")
     st.caption("動画を取り込み、自然言語で検索・質問する")
+    st.info("🔬 これは PR プレビュー環境です（k8s 越し UI 動作確認）", icon="🔬")
 
     api_base = st.text_input("API URL", value=DEFAULT_BASE_URL)
     client = ClipMindClient(api_base)
