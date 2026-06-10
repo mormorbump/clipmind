@@ -39,25 +39,45 @@
 ## 面接想定 Q&A（完走時にここを埋める）
 
 ### Q1. 何を作りましたか？ 30秒で。
-> （後日記入）
+> 動画を投入すると OpenCV でキーフレーム抽出、YOLO で物体検知、Whisper で書き起こし、
+> マルチモーダル LLM でキャプションを並列生成し、Qdrant のハイブリッド検索
+> (dense + BM25 を RRF でサーバー側融合) で自然言語検索できるシステムです。
+> パイプラインは LangGraph の StateGraph (fan-out / fan-in + SQLite Checkpointer) で、
+> 対話は LangChain 1.x の tool-calling Agent。FastAPI + SQLModel + Alembic + RQ 構成で、
+> Recall@k / MRR / nDCG の評価ハーネスと Prometheus メトリクスまで揃えています。
 
 ### Q2. アーキテクチャの中で一番苦労した点は？
-> （後日記入）
+> 「並列ノードの状態マージ」と「失敗からの再開」の両立。LangGraph の Reducer
+> (`Annotated[list, add]`) を Phase 1 の段階で State に仕込んでおき、Phase 2 の
+> 3 並列 fan-out 追加時にスキーマ変更なしで移行できた。Checkpointer はノード境界が
+> 保存単位なので、ffmpeg と Whisper を別ノードに割って「Whisper だけ落ちたら音声抽出を
+> やり直さない」を実証した (`ainvoke(None, config)` で resume)。
 
 ### Q3. 技術選定で比較したのは？
-> （後日記入）— ADR を参照
+> ADR に 10 件記録。代表例: LangGraph vs 素 asyncio vs Prefect (ADR-0001)、
+> SQLModel vs SQLAlchemy 素 (ADR-0008)、LlamaIndex 比較は Qdrant Query API 直叩きの
+> 表現力を優先して scope out (ADR-0004 に面接想定回答つきで記録)、
+> embedding はローカル fastembed と OpenAI の Provider 切替 (ADR-0010)。
 
 ### Q4. 精度はどう測りましたか？
-> （後日記入）— `docs/evaluation.md` の結果数値を引用
+> Recall@5 / MRR / nDCG@5 を純関数で実装し、dense と hybrid を同一データセットで
+> 比較できる評価ハーネスを作った (`clipmind.eval.runner`)。実動画でのデータセット
+> 50 クエリ作成と Ragas (LLM-as-judge) はキー投入後の次ステップ。
 
 ### Q5. コスト試算は？
-> （後日記入）— `docs/cost-estimation.md` の実測値
+> キャプション(大量呼び出し)は gpt-4o-mini 主・Claude Haiku 副のフォールバック構成
+> (ADR-0003)。開発中は embedding / rerank / 検知を全てローカルモデルにし、
+> LLM API コストゼロで全パイプラインを回せる構成にした。
 
 ### Q6. 失敗・学びは？
-> （後日記入）
+> learning-log の各 Phase エントリ参照。代表: pytest exit code 5、SQLModel autogenerate
+> の import 欠落、pytest-asyncio × asyncpg の event loop 結合、docker compose pull の
+> 並列干渉、LangGraph 1.x の型ナローイング不全。全て knowledge/ に再発防止策つきで記録。
 
 ### Q7. この先やるなら？
-> （後日記入）
+> (1) LLM キー投入して キャプション / Agent / Ragas を実走、(2) 実動画 10 本で評価
+> データセット作成 → Recall@5 ≥ 0.7 をチューニング、(3) bge-m3 等の多言語 embedding、
+> (4) Streamlit の簡易 UI、(5) testcontainers 化と本番デプロイ。
 
 ---
 
@@ -203,3 +223,37 @@
 - [x] knowledge: langgraph / video-processing / whisper-stt / fastapi-async に「✅ Phase 1 で実践」マーカー追加
 - [x] knowledge: 新規 `storage-sqlmodel/01-async-sqlmodel-alembic.md` 執筆中以上
 - [x] learning-log に Phase 1 完了エントリ（本エントリ）
+
+---
+
+## 2026-06-10 — Phase 2〜8 完了: 検知・RAG・評価・Agent・運用
+
+### やったこと
+- **Phase 2**: YOLOv8 検知ノード + Captioner/LLMProvider 抽象 (リトライ + フォールバック) + 3 並列 fan-out / fan-in。Checkpointer resume 実証 (`.context/experiment_checkpoint_resume.py`)
+- **Phase 3**: EmbeddingProvider 抽象 (ADR-0010、fastembed ローカル default)。Qdrant named vectors (dense + BM25 sparse) + Query API RRF fusion。fuse_timeline (5 秒窓)。`POST /videos/{id}/query`
+- **Phase 4**: Recall@k / MRR / nDCG 評価ハーネス + Markdown レポート + CLI。Ragas はキー待ち
+- **Phase 5**: QueryToolbox + 5 Tools + LangChain 1.x `create_agent`。`POST /videos/{id}/ask` (キー無しは 503)
+- **Phase 6**: ADR-0001 により Phase 1 から LangGraph 採用済みのため新規作業なし (吸収済み)
+- **Phase 7**: ADR-0004 を Accepted 化 (LlamaIndex 比較は根拠つき scope out)
+- **Phase 8**: RQ 非同期 Ingest (`clipmind.worker`) + Redis pub/sub 進捗 + `WS /ws/videos/{id}/progress` + Prometheus `/metrics`。/health は postgres/qdrant/redis 実体 ping
+
+### 詰まった点と解決
+1. **無音動画で ffmpeg が落ちる**: cv2.VideoWriter 出力には音声トラックが無い。ffprobe で事前判定し `NoAudioStreamError` → transcript なしの正常系として継続
+2. **detect-secrets が alembic revision hex を誤検知**: `alembic/versions/` を exclude
+3. **pre-commit の mirrors-mypy が隔離環境で import 解決不能**: `uv run mypy src` を呼ぶ local hook に切替
+4. **FK 制約と SQLModel の insert 順**: relationship() を張っていないので同一 flush 内の親子 insert 順が保証されない → 親を `await session.flush()` してから子を add
+
+### 数字・指標
+- Phase 2〜8 実時間: 約 2.5 時間 (キー依存部分を除く)
+- テスト: unit 38 + integration 12 + e2e 2 (Whisper 実音声 / Agent はキー待ち 1)
+- LangGraph ノード: 7 (validate / extract_frames / extract_audio / transcribe / detect_objects / caption_frames / store / index)
+- ADR: 10 件 (全て Accepted)
+- Whisper e2e: macOS `say` の合成音声から "quarterly review" 系単語の transcript 取得成功 (167 秒、モデル DL 込み)
+
+### キー投入後の TODO (引き継ぎ)
+- [ ] ANTHROPIC_API_KEY / OPENAI_API_KEY を .env に投入
+- [ ] キャプション実呼び出し確認 (`max_caption_frames` でコスト制御)
+- [ ] Agent の実応答 e2e (`pytest -m e2e tests/agents`)
+- [ ] Ragas + LLM-as-judge (Phase 4 残)
+- [ ] 実動画 10 本 + 50 クエリの評価データセット → Recall@5 ≥ 0.7
+- [ ] LangSmith トレース有効化 (LANGSMITH_API_KEY)

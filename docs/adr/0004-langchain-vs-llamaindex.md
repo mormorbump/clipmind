@@ -1,7 +1,7 @@
 # ADR 0004: LangChain vs LlamaIndex の使い分け
 
 ## ステータス
-Proposed — 2026-04-25（Phase 7 完了時に Accepted/Rejected を確定）
+Accepted — 2026-06-10（LlamaIndex 比較実装は scope out、根拠は改訂履歴参照）
 
 ## コンテキスト
 
@@ -58,3 +58,19 @@ Proposed — 2026-04-25（Phase 7 完了時に Accepted/Rejected を確定）
 
 - LlamaIndex 側で本プロジェクトに有用な新機能（動画特化 Reader 等）が出た場合
 - RAG 精度が行き詰まり、別アーキテクチャが必要になった場合
+
+## 改訂履歴
+
+- **2026-06-10**: Accepted に確定。Phase 3〜5 の実装結果を踏まえ、**LlamaIndex の比較実装は見送り**:
+  1. Phase 3 で Qdrant の Query API (prefetch + RRF fusion) を**直接**使う構成になった。
+     ハイブリッド検索・フィルタ・named vectors はクライアント直叩きが最も表現力が高く、
+     LlamaIndex の `VectorStoreIndex` を挟むと Query API の RRF fusion が抽象に隠れて逆に書きづらい
+  2. Agent は LangChain 1.x `create_agent`（LangGraph ベース）で実装済み。Orchestration も LangGraph。
+     ここに LlamaIndex を足すと依存とメンテ面の複雑さだけ増える
+  3. 評価基盤 (Phase 4) は SegmentIndex 抽象に対して動くので、
+     将来 LlamaIndex Retriever を足した場合も同じハーネスで比較可能（再開コストは低い）
+
+  面接想定回答: 「LlamaIndex は QueryEngine の階層が深く RAG パターンが組み込みで豊富だが、
+  本プロジェクトは Qdrant の Query API（RRF fusion・named vectors）を直接使う構成にしたため、
+  中間抽象を挟む利点よりも表現力の損失が大きかった。評価ハーネスは Retriever 抽象に対して
+  作ってあるので、必要になれば LlamaIndex 実装を 0.5 日で追加比較できる」

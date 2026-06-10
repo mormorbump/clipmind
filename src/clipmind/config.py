@@ -53,6 +53,12 @@ class Settings(BaseSettings):
         default=False, description="CrossEncoder 再ランク (モデルダウンロードが走るため既定 off)"
     )
 
+    # 運用 (Phase 8)
+    enable_async_ingest: bool = Field(
+        default=False,
+        description="True なら Ingest を RQ ワーカーに退避 (要 redis + rq worker プロセス)",
+    )
+
     # Phase 1: ローカル開発の永続データ配置先（.gitignore 済み）
     data_dir: Path = Field(
         default=Path(".data"), description="ローカル開発で使う永続データの基準ディレクトリ"

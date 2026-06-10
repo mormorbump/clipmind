@@ -21,6 +21,20 @@ async def postgres_ping() -> bool:
         return False
 
 
+async def redis_ping(redis_url: str) -> bool:
+    """Redis に PING を投げて成功すれば True."""
+    try:
+        import redis.asyncio as aioredis
+
+        client = aioredis.from_url(redis_url)  # type: ignore[no-untyped-call]
+        try:
+            return bool(await client.ping())
+        finally:
+            await client.aclose()
+    except Exception:
+        return False
+
+
 async def qdrant_ping(qdrant_url: str) -> bool:
     """Qdrant の collection 一覧 API を叩いて成功すれば True."""
     try:

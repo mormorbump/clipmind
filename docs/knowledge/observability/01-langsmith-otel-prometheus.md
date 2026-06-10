@@ -185,4 +185,9 @@ log.info("ingest_stage_complete", video_id=vid, stage="transcribe", duration_ms=
 
 ## 実践マーカー
 
-- 未実装（Phase 8 で着手予定）
+- ✅ Phase 8 で一部実践
+  - **Prometheus**: `prometheus-fastapi-instrumentator` で `/metrics` を公開。`Instrumentator().instrument(app).expose(app)` の 2 行で http_requests_total 等が取れる
+  - **進捗の可視化**: Redis pub/sub (`clipmind:progress:{video_id}`) + `WS /ws/videos/{id}/progress`。LangGraph の `astream(stream_mode="updates")` がノード完了ごとにイベントを返すので、それを進捗発行のフックにした
+  - 「最後のイベントを Redis に `SET ... EX 3600` で保存」しておくと、途中接続した WS クライアントにも現状を返せる
+- ⏸ LangSmith は LANGSMITH_API_KEY 投入待ち (settings は Phase 0 から用意済み)
+- ⏸ OpenTelemetry は milestones の早期撤退ポイントに従い見送り (LangSmith + Prometheus で観測性は確保)

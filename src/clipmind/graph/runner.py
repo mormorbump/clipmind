@@ -18,6 +18,7 @@ from clipmind.graph.state import (
     IngestState,
     TranscriptSegment,
 )
+from clipmind.ingest.progress import NullProgressPublisher, ProgressPublisher
 from clipmind.llm.captioner import Captioner, NullCaptioner
 
 if TYPE_CHECKING:
@@ -37,6 +38,7 @@ async def run_ingest(
     session_maker: async_sessionmaker[AsyncSession],
     captioner: Captioner | None = None,
     segment_index: SegmentIndex | None = None,
+    progress: ProgressPublisher | None = None,
     whisper_model_size: str = "base",
     enable_detection: bool = True,
     max_caption_frames: int | None = 20,
@@ -81,10 +83,24 @@ async def run_ingest(
         "errors": cast("list[str]", []),
     }
 
+    publisher: ProgressPublisher = progress if progress is not None else NullProgressPublisher()
+
     async with AsyncSqliteSaver.from_conn_string(str(checkpoint_db_path)) as saver:
         graph = builder.compile(checkpointer=saver)
         config = {"configurable": {"thread_id": f"ingest-{video_id}"}}
-        # LangGraph 1.2 の Pregel.ainvoke は overload が複雑で `config=dict` の引数推論が
-        # 効きづらい. 動作上は正しい呼び出しなので type: ignore で抑止.
-        result = await graph.ainvoke(initial_state, config=config)  # type: ignore[call-overload]
+        # stream_mode="updates" でノード完了ごとにイベントが来る → 進捗発行 (M8-1)
+        # LangGraph 1.2 の astream は overload が複雑で config=dict の推論が効かないため抑止.
+        final_state: dict[str, object] = dict(initial_state)
+        async for update in graph.astream(  # type: ignore[call-overload]
+            initial_state, config=config, stream_mode="updates"
+        ):
+            for node_name, node_output in update.items():
+                if isinstance(node_output, dict):
+                    final_state.update(node_output)
+                await publisher.publish(video_id, node_name)
+        await publisher.publish(video_id, "completed")
+
+        # astream の updates は「差分」なので、確定 State は checkpointer から取り直す
+        snapshot = await graph.aget_state(config)  # type: ignore[arg-type]
+        result = snapshot.values if snapshot.values else final_state
     return cast("IngestState", result)

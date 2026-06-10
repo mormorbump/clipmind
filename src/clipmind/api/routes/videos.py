@@ -101,31 +101,37 @@ async def upload_video(
             )
         video_uuid = created.id
 
-    # Ingest 実行 (Phase 1 は同期). 失敗しても 201 は返し、DB の status で表現.
-    try:
-        from clipmind.api.deps import get_segment_index
-        from clipmind.llm.factory import build_captioner
+    if settings.enable_async_ingest:
+        # Phase 8: RQ ワーカーに退避 (202 Accepted 相当. 進捗は WS で配信)
+        from clipmind.worker import enqueue_ingest
 
-        await run_ingest(
-            video_id=video_uuid.hex,
-            video_path=Path(settings.object_store_dir / key),
-            object_store=object_store,
-            audio_dir=settings.data_dir / "audio",
-            checkpoint_db_path=settings.checkpoint_db_path,
-            session_maker=session_maker,
-            captioner=build_captioner(settings),
-            segment_index=get_segment_index() if settings.enable_indexing else None,
-            whisper_model_size=settings.whisper_model_size,
-            enable_detection=settings.enable_detection,
-            max_caption_frames=settings.max_caption_frames,
-        )
-    except Exception:
-        async with session_maker() as session:
-            repo = VideoRepository(session)
-            video = await repo.get(video_uuid)
-            if video is not None:
-                video.status = "failed"
-                await session.commit()
+        enqueue_ingest(settings.redis_url, video_uuid.hex, key)
+    else:
+        # 同期実行. 失敗しても 201 は返し、DB の status で表現.
+        try:
+            from clipmind.api.deps import get_segment_index
+            from clipmind.llm.factory import build_captioner
+
+            await run_ingest(
+                video_id=video_uuid.hex,
+                video_path=Path(settings.object_store_dir / key),
+                object_store=object_store,
+                audio_dir=settings.data_dir / "audio",
+                checkpoint_db_path=settings.checkpoint_db_path,
+                session_maker=session_maker,
+                captioner=build_captioner(settings),
+                segment_index=get_segment_index() if settings.enable_indexing else None,
+                whisper_model_size=settings.whisper_model_size,
+                enable_detection=settings.enable_detection,
+                max_caption_frames=settings.max_caption_frames,
+            )
+        except Exception:
+            async with session_maker() as session:
+                repo = VideoRepository(session)
+                video = await repo.get(video_uuid)
+                if video is not None:
+                    video.status = "failed"
+                    await session.commit()
 
     return VideoCreatedResponse(
         video_id=str(video_uuid),
