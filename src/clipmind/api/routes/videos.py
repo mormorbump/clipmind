@@ -175,3 +175,94 @@ async def get_video(
             "completed_at": video.completed_at,
         }
     )
+
+
+class VideoListItem(VideoDetailResponse):
+    """一覧用 (詳細と同形)."""
+
+
+@router.get("", response_model=list[VideoListItem])
+async def list_videos(
+    session_maker: Annotated[async_sessionmaker[AsyncSession], Depends(_get_session_maker)],
+    limit: int = 50,
+) -> list[VideoListItem]:
+    """直近の動画一覧 (UI の動画セレクタ用)."""
+    async with session_maker() as session:
+        repo = VideoRepository(session)
+        videos = await repo.list_recent(limit=min(limit, 200))
+        items: list[VideoListItem] = []
+        for v in videos:
+            frame_count = await repo.count_frames(v.id)
+            seg_count = await repo.count_transcript_segments(v.id)
+            items.append(
+                VideoListItem.model_validate(
+                    {
+                        "video_id": str(v.id),
+                        "status": v.status,
+                        "sha256": v.sha256,
+                        "duration_seconds": v.duration_seconds,
+                        "frame_count": frame_count,
+                        "transcript_segment_count": seg_count,
+                        "created_at": v.created_at,
+                        "completed_at": v.completed_at,
+                    }
+                )
+            )
+    return items
+
+
+@router.get("/{video_id}/progress")
+async def get_progress(
+    video_id: str,
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> dict[str, object]:
+    """Ingest 進捗の最新イベント (Redis 保存値) を返す. UI のポーリング用.
+
+    WS (/ws/videos/{id}/progress) のフォールバック. Redis 不通や記録なしは
+    stage="unknown" を返す.
+    """
+    try:
+        import redis.asyncio as aioredis
+
+        client = aioredis.from_url(settings.redis_url)  # type: ignore[no-untyped-call]
+        try:
+            raw = await client.get(f"clipmind:progress-latest:{video_id.replace('-', '')}")
+            if raw is None:
+                raw = await client.get(f"clipmind:progress-latest:{video_id}")
+        finally:
+            await client.aclose()
+    except Exception:
+        return {"stage": "unknown", "progress": 0.0}
+
+    if raw is None:
+        return {"stage": "unknown", "progress": 0.0}
+    import json
+
+    return dict(json.loads(raw))
+
+
+@router.get("/{video_id}/frame")
+async def get_nearest_frame(
+    video_id: str,
+    session_maker: Annotated[async_sessionmaker[AsyncSession], Depends(_get_session_maker)],
+    object_store: Annotated[ObjectStore, Depends(get_object_store)],
+    timestamp_ms: int = 0,
+) -> dict[str, object]:
+    """指定時刻に最も近いキーフレームの URL を返す (検索結果のサムネイル用)."""
+    from uuid import UUID
+
+    try:
+        video_uuid = UUID(video_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail="invalid video_id") from e
+
+    async with session_maker() as session:
+        repo = VideoRepository(session)
+        frame = await repo.nearest_frame(video_uuid, timestamp_ms)
+    if frame is None:
+        raise HTTPException(status_code=404, detail="no frames for video")
+    return {
+        "frame_url": object_store.url_for(frame.object_store_key),
+        "timestamp_ms": frame.timestamp_ms,
+        "frame_index": frame.frame_index,
+    }

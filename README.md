@@ -64,7 +64,7 @@ OpenCV によるフレーム抽出、YOLO による物体検知、Whisper によ
 | 6 | LangGraph 化 | ✅ Phase 1 から LangGraph で実装済み (ADR-0001) |
 | 7 | LlamaIndex 比較 | ✅ scope out を ADR-0004 に記録 |
 | 8 | RQ 非同期 Ingest + WebSocket 進捗 + Prometheus | ✅ |
-| 9 | UI / デモ | API + curl デモ (UI は任意) |
+| 9 | UI / デモ | ✅ Streamlit UI (`ui/app.py`) |
 
 ## クイックスタート
 
@@ -95,6 +95,18 @@ curl -X POST http://localhost:8000/api/v1/videos/<video_id>/ask \
   -H 'Content-Type: application/json' \
   -d '{"question": "この動画の要点は？"}'
 ```
+
+### Web UI (Streamlit)
+
+```bash
+# API を起動した状態で:
+uv run --group ui streamlit run ui/app.py
+# http://localhost:8501
+```
+
+サイドバーでバックエンドのヘルス状態と対象動画を選択し、3 タブで操作する:
+**📥 取り込み** (アップロード + 進捗バー) / **🔍 検索** (hybrid・dense、キーフレーム画像つき) /
+**💬 質問** (Agent チャット。LLM キー未設定時はその旨を表示)。
 
 ### 非同期 Ingest (Phase 8)
 

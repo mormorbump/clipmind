@@ -1,0 +1,1 @@
+"""ClipMind Streamlit UI."""

@@ -1,0 +1,12 @@
+# ClipMind UI テーマ (ダーク + アンバーアクセント)
+# 映像ドメインに合わせた暗室トーン. 紫青グラデーション系の汎用テーマは避ける.
+[theme]
+base = "dark"
+primaryColor = "#E8A33D"
+backgroundColor = "#101418"
+secondaryBackgroundColor = "#1A2026"
+textColor = "#E8E6E3"
+font = "sans serif"
+
+[server]
+maxUploadSize = 2048  # MB. API 側の 2GB 上限と揃える
