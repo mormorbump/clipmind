@@ -13,7 +13,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from clipmind.api.deps import get_settings
-from clipmind.api.routes import health, videos
+from clipmind.api.routes import health, query, videos
 
 
 @asynccontextmanager
@@ -35,6 +35,7 @@ def create_app() -> FastAPI:
     )
     app.include_router(health.router)
     app.include_router(videos.router)
+    app.include_router(query.router)
 
     # Object Store 配下を /static で配信
     settings = get_settings()

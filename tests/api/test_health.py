@@ -1,7 +1,7 @@
 """`GET /health` の最小テスト.
 
-unit テストでは `postgres_ping` を monkeypatch で握りつぶし、DB に触らない.
-実 Postgres ping は tests/storage/test_video_repo.py で検証する.
+unit テストでは ping 関数を monkeypatch で握りつぶし、外部サービスに触らない.
+実 ping は integration テストで検証する.
 """
 
 from __future__ import annotations
@@ -12,14 +12,19 @@ from httpx import ASGITransport, AsyncClient
 from clipmind.api.main import create_app
 
 
+async def _ok(*_a: object, **_kw: object) -> bool:
+    return True
+
+
+async def _bad(*_a: object, **_kw: object) -> bool:
+    return False
+
+
 @pytest.mark.asyncio
-async def test_health_returns_healthy_when_postgres_ok(monkeypatch: pytest.MonkeyPatch) -> None:
-    """postgres_ping が成功なら status='healthy'."""
-
-    async def _ok() -> bool:
-        return True
-
+async def test_health_returns_healthy_when_all_ok(monkeypatch: pytest.MonkeyPatch) -> None:
+    """postgres / qdrant とも成功なら status='healthy'."""
     monkeypatch.setattr("clipmind.api.routes.health.postgres_ping", _ok)
+    monkeypatch.setattr("clipmind.api.routes.health.qdrant_ping", _ok)
 
     app = create_app()
     transport = ASGITransport(app=app)
@@ -30,6 +35,7 @@ async def test_health_returns_healthy_when_postgres_ok(monkeypatch: pytest.Monke
     body = resp.json()
     assert body["status"] == "healthy"
     assert body["deps"]["postgres"] == "ok"
+    assert body["deps"]["qdrant"] == "ok"
     assert set(body["deps"].keys()) == {"postgres", "redis", "qdrant", "anthropic"}
 
 
@@ -38,11 +44,8 @@ async def test_health_returns_degraded_when_postgres_down(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """postgres_ping が失敗なら status='degraded'."""
-
-    async def _bad() -> bool:
-        return False
-
     monkeypatch.setattr("clipmind.api.routes.health.postgres_ping", _bad)
+    monkeypatch.setattr("clipmind.api.routes.health.qdrant_ping", _ok)
 
     app = create_app()
     transport = ASGITransport(app=app)
@@ -53,3 +56,4 @@ async def test_health_returns_degraded_when_postgres_down(
     body = resp.json()
     assert body["status"] == "degraded"
     assert body["deps"]["postgres"] == "error"
+    assert body["deps"]["qdrant"] == "ok"

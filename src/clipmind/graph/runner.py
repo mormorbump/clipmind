@@ -23,6 +23,7 @@ from clipmind.llm.captioner import Captioner, NullCaptioner
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+    from clipmind.rag.indexer import SegmentIndex
     from clipmind.storage.object_store import ObjectStore
 
 
@@ -35,6 +36,7 @@ async def run_ingest(
     checkpoint_db_path: Path,
     session_maker: async_sessionmaker[AsyncSession],
     captioner: Captioner | None = None,
+    segment_index: SegmentIndex | None = None,
     whisper_model_size: str = "base",
     enable_detection: bool = True,
     max_caption_frames: int | None = 20,
@@ -61,6 +63,7 @@ async def run_ingest(
         audio_dir=audio_dir,
         session_maker=session_maker,
         captioner=captioner if captioner is not None else NullCaptioner(),
+        segment_index=segment_index,
         whisper_model_size=whisper_model_size,
         enable_detection=enable_detection,
         max_caption_frames=max_caption_frames,
