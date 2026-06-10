@@ -18,7 +18,8 @@ def make_transcribe_node(model_size: str = "base"):  # type: ignore[no-untyped-d
     async def transcribe_node(state: IngestState) -> IngestState:
         audio_path = state.get("audio_path")
         if not audio_path:
-            return {"errors": ["transcribe: audio_path is empty"]}
+            # 無音動画 (extract_audio が audio_path=None を返した) は transcript なしで通す
+            return {}
 
         try:
             segments = await asyncio.to_thread(transcribe, Path(audio_path), model_size=model_size)

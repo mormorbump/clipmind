@@ -103,6 +103,8 @@ async def upload_video(
 
     # Ingest 実行 (Phase 1 は同期). 失敗しても 201 は返し、DB の status で表現.
     try:
+        from clipmind.llm.factory import build_captioner
+
         await run_ingest(
             video_id=video_uuid.hex,
             video_path=Path(settings.object_store_dir / key),
@@ -110,6 +112,10 @@ async def upload_video(
             audio_dir=settings.data_dir / "audio",
             checkpoint_db_path=settings.checkpoint_db_path,
             session_maker=session_maker,
+            captioner=build_captioner(settings),
+            whisper_model_size=settings.whisper_model_size,
+            enable_detection=settings.enable_detection,
+            max_caption_frames=settings.max_caption_frames,
         )
     except Exception:
         async with session_maker() as session:

@@ -243,3 +243,32 @@ graph = graph.compile(checkpointer=SqliteSaver.from_conn_string("checkpoints.db"
 - **罠 2 — `ainvoke(initial_state, config={...})` の overload 不一致**: LangGraph 1.2 の `Pregel.ainvoke` は overload が複雑で `config=dict` のキーワード推論が効きづらい。`# type: ignore[call-overload]` で凌いだ。
 - **罠 3 — TypedDict + Annotated[list, add] 初期化**: 空 list を `[]` で渡すと `list[Never]` 推論で TypedDict 構築時に型エラー。`cast("list[Frame]", [])` 等で明示。
 - 学び: **LangGraph の型サポートはまだ発展途上**。strict mypy では `# type: ignore` を一定許容するか、内部で `Any` を経由するヘルパで吸収する戦略が必要。
+
+### ✅ Checkpointer resume 実証 (Phase 2 着手時)
+
+`.context/experiment_checkpoint_resume.py` で実証した流れ:
+
+```
+1 回目: extract (成功・checkpoint) → transcribe (故意に raise) → graph 失敗
+        state.next == ('transcribe',)   ← 再開地点が記録されている
+2 回目: graph.ainvoke(None, config)     ← input=None + 同じ thread_id で resume
+        → extract は再実行されず、transcribe からだけ続行して完走
+```
+
+ポイント:
+- **resume は `ainvoke(None, config)`**。初期 State を渡し直すと「新しい実行」になってしまう
+- `graph.aget_state(config)` で「どこまで進んだか (`state.next`)」と「checkpoint 済みの値」を確認できる
+- checkpoint の単位はノード境界。だから extract_audio / transcribe を分割した（Whisper だけ落ちたとき音声抽出をやり直さない）
+
+### ✅ fan-out / fan-in と Reducer の実働 (Phase 2)
+
+Phase 2 で extract_frames の後段を 3 並列に拡張:
+
+```
+extract_frames ─┬→ extract_audio → transcribe ─┐
+                ├→ detect_objects ─────────────┼→ store (fan-in)
+                └→ caption_frames ─────────────┘
+```
+
+- fan-in は `graph.add_edge(["transcribe", "detect_objects", "caption_frames"], "store")` — リストを渡すと全ノード完了待ち
+- 並列 3 経路がそれぞれ `errors` キーに書き込むため、`Annotated[list[str], add]` の Reducer がないと `InvalidUpdateError` になる — Phase 1 で「YAGNI すれすれ」と書いた前方互換がここで効いた
