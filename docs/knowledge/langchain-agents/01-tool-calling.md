@@ -265,4 +265,9 @@ async def run(input):
 
 ## 実践マーカー
 
-- 未実装（Phase 5 で着手予定）
+- ✅ Phase 5 で実践 (`src/clipmind/agents/`)
+  - **Toolbox パターン**: Tool の実体ロジックは `QueryToolbox` クラスのメソッドにし、LangChain `@tool` ラッパーは `build_tools()` で生成。**Tool 単体を LLM なしでテストできる**のが利点
+  - **5 Tool**: hybrid_search / filter_by_time / filter_by_object / get_frame_image / get_video_metadata。summarize_segment は Tool にせず Agent の応答生成に内製させた（Tool を増やすより選択ミスが減る）
+  - **LangChain 1.x の `create_agent`**: 旧 `create_tool_calling_agent` + `AgentExecutor` は langchain-classic に移動済み。1.x では `from langchain.agents import create_agent` が標準で、**内部は LangGraph の Agent Loop**。knowledge/langgraph/02 の整理（対話 = 動的ツール選択 → Agent Loop）と実装が一致した
+  - **モデル選択 (ADR-0003)**: 対話 Agent は Claude Sonnet 優先、無ければ GPT-4o。キーが無ければ `AgentUnavailableError` → API は 503
+  - 実 LLM での応答テストは `@pytest.mark.e2e` (キー投入後に実行)
