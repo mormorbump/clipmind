@@ -22,9 +22,10 @@ async def _bad(*_a: object, **_kw: object) -> bool:
 
 @pytest.mark.asyncio
 async def test_health_returns_healthy_when_all_ok(monkeypatch: pytest.MonkeyPatch) -> None:
-    """postgres / qdrant とも成功なら status='healthy'."""
+    """postgres / qdrant / redis すべて成功なら status='healthy'."""
     monkeypatch.setattr("clipmind.api.routes.health.postgres_ping", _ok)
     monkeypatch.setattr("clipmind.api.routes.health.qdrant_ping", _ok)
+    monkeypatch.setattr("clipmind.api.routes.health.redis_ping", _ok)
 
     app = create_app()
     transport = ASGITransport(app=app)
@@ -36,6 +37,7 @@ async def test_health_returns_healthy_when_all_ok(monkeypatch: pytest.MonkeyPatc
     assert body["status"] == "healthy"
     assert body["deps"]["postgres"] == "ok"
     assert body["deps"]["qdrant"] == "ok"
+    assert body["deps"]["redis"] == "ok"
     assert set(body["deps"].keys()) == {"postgres", "redis", "qdrant", "anthropic"}
 
 
@@ -46,6 +48,7 @@ async def test_health_returns_degraded_when_postgres_down(
     """postgres_ping が失敗なら status='degraded'."""
     monkeypatch.setattr("clipmind.api.routes.health.postgres_ping", _bad)
     monkeypatch.setattr("clipmind.api.routes.health.qdrant_ping", _ok)
+    monkeypatch.setattr("clipmind.api.routes.health.redis_ping", _ok)
 
     app = create_app()
     transport = ASGITransport(app=app)

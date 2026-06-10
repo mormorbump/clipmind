@@ -13,7 +13,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from clipmind.api.deps import get_settings
-from clipmind.api.routes import ask, health, query, videos
+from clipmind.api.routes import ask, health, progress_ws, query, videos
 
 
 @asynccontextmanager
@@ -37,6 +37,12 @@ def create_app() -> FastAPI:
     app.include_router(videos.router)
     app.include_router(query.router)
     app.include_router(ask.router)
+    app.include_router(progress_ws.router)
+
+    # Prometheus メトリクス (M8-2): /metrics で exposition format を公開
+    from prometheus_fastapi_instrumentator import Instrumentator
+
+    Instrumentator().instrument(app).expose(app, endpoint="/metrics", tags=["metrics"])
 
     # Object Store 配下を /static で配信
     settings = get_settings()

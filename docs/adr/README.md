@@ -9,7 +9,7 @@
 | 0001 | [LangGraph を Phase 1 着手時から採用する](0001-use-langgraph-from-start.md) | Accepted |
 | 0002 | [Vector DB は Qdrant に単一化する](0002-vector-db-qdrant-single.md) | Accepted |
 | 0003 | [マルチLLMプロバイダ対応（Anthropic + OpenAI）](0003-multi-llm-provider.md) | Accepted |
-| 0004 | [LangChain vs LlamaIndex の使い分け](0004-langchain-vs-llamaindex.md) | Proposed |
+| 0004 | [LangChain vs LlamaIndex の使い分け](0004-langchain-vs-llamaindex.md) | Accepted |
 | 0005 | [YouTube ダウンロードをサポートしない](0005-youtube-tos-policy.md) | Accepted |
 | 0006 | [評価戦略: Ragas + 自作データセット](0006-evaluation-strategy.md) | Accepted |
 | 0007 | [Python 3.11 + uv + ruff/mypy/pytest をツールチェーン標準](0007-toolchain.md) | Accepted |
