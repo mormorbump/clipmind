@@ -1,0 +1,9 @@
+# PR プレビュー用 namespace。
+# name は kustomize の namespace 設定（k8s-action の汎用 ApplicationSet が
+# preview-clipmind-<N> を渡す）で上書きされる。istio-injection で sidecar 注入。
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: preview-clipmind-0
+  labels:
+    istio-injection: enabled
