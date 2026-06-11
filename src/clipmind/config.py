@@ -66,6 +66,13 @@ class Settings(BaseSettings):
     object_store_subdir: str = Field(
         default="objects", description="data_dir 配下の Object Store サブディレクトリ"
     )
+    # キーフレーム画像等の公開 URL プレフィックス。デフォルトの /static は
+    # ローカル/単体配信では問題ないが、Streamlit UI も /static を使うため、
+    # 同一ホストで配信するリバースプロキシ環境 (k8s プレビュー等) では衝突する。
+    # その場合は OBJECT_STORE_URL_PREFIX=/media のように変更して分離する。
+    object_store_url_prefix: str = Field(
+        default="/static", description="Object Store の公開 URL プレフィックス"
+    )
     checkpoint_db_subpath: str = Field(
         default="checkpoints/ingest.db",
         description="data_dir 配下の LangGraph SQLite Checkpointer ファイル",

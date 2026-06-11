@@ -1,0 +1,21 @@
+# ClipMind の PR プレビュー用デプロイ定義（アプリリポジトリが所有）。
+# k8s-action の汎用 ApplicationSet が PR ごとに:
+#   - namespace を preview-clipmind-<N> で上書き
+#   - images の newTag を head SHA に差し替え
+#   - VirtualService preview-entry の host を pr-<N>.clipmind.<IP>.nip.io に patch
+# する。アプリ固有の構成（ストア・パス・env）はすべてこの deploy/ に閉じている。
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: preview-clipmind-0 # ApplicationSet の kustomize.namespace で上書き
+resources:
+  - namespace.yaml
+  - app.yaml
+  - ui.yaml
+  - stores.yaml
+  - virtualservice.yaml
+images:
+  # newTag は ApplicationSet が head SHA に上書きする（ローカル build 用に latest）
+  - name: us-central1-docker.pkg.dev/k8s-action-preview-26/preview/clipmind
+    newTag: latest
+  - name: us-central1-docker.pkg.dev/k8s-action-preview-26/preview/clipmind-ui
+    newTag: latest

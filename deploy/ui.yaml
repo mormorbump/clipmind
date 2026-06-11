@@ -1,0 +1,62 @@
+# ClipMind Web UI (Streamlit)。API 接続は 2 系統:
+# - CLIPMIND_API_URL:        Streamlit サーバプロセス → API（クラスタ内 DNS）
+# - CLIPMIND_PUBLIC_API_URL: ブラウザが <img src> 等で参照する URL。
+#   空文字 = 相対パス（/media/...）。ブラウザは現在のホストで解決し、
+#   同一ホストの VirtualService が /media を API に振り分ける。これにより
+#   「PR ごとの外部ホストを env に注入する」アプリ固有 patch が不要になる。
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ui
+  labels:
+    app: ui
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ui
+  template:
+    metadata:
+      labels:
+        app: ui
+      annotations:
+        proxy.istio.io/config: |
+          holdApplicationUntilProxyStarts: true
+    spec:
+      containers:
+        - name: ui
+          image: us-central1-docker.pkg.dev/k8s-action-preview-26/preview/clipmind-ui:latest
+          ports:
+            - containerPort: 8501
+          env:
+            - name: CLIPMIND_PUBLIC_API_URL
+              value: "" # 相対パス（同一ホスト配信）。host 依存の patch を不要にする
+            - name: CLIPMIND_API_URL
+              value: http://clipmind # 同 namespace の API Service
+          readinessProbe:
+            httpGet:
+              path: /_stcore/health
+              port: 8501
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 30m
+              memory: 128Mi
+            limits:
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ui
+  labels:
+    app: ui
+spec:
+  type: ClusterIP
+  selector:
+    app: ui
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8501

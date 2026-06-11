@@ -1,0 +1,49 @@
+# プレビューの入口（path ベースで API / Web UI に分岐）。
+#
+#   /api/ /health /ws/ /media/ /docs /openapi.json /redoc /metrics → API (FastAPI)
+#   それ以外（/, /static/*, /_stcore/* など）                       → Web UI (Streamlit)
+#
+# UI をデフォルト側にすることで、Streamlit の内部パス（/static の JS/CSS,
+# websocket /_stcore/stream 等）を列挙せずに済む。API のパスだけ列挙すればよい。
+#
+# 規約: 名前は preview-entry 固定（k8s-action の汎用 ApplicationSet が
+# hosts[0] を pr-<N>.clipmind.<IP>.nip.io に patch するため）。
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: preview-entry
+spec:
+  hosts:
+    - "pr-0.clipmind.104.154.128.86.nip.io" # patched by ApplicationSet
+  gateways:
+    - baseline/preview-gateway # k8s-action が管理する共有 Gateway に相乗り
+  http:
+    - match: # 配列内は OR
+        - uri:
+            prefix: /api/
+        - uri:
+            prefix: /health
+        - uri:
+            prefix: /ws/
+        - uri:
+            # キーフレーム画像（API の Object Store, OBJECT_STORE_URL_PREFIX=/media）。
+            # Streamlit も /static を使うため API 側は /media に分離
+            prefix: /media/
+        - uri:
+            prefix: /docs
+        - uri:
+            prefix: /openapi.json
+        - uri:
+            prefix: /redoc
+        - uri:
+            prefix: /metrics
+      route:
+        - destination:
+            host: clipmind # 短縮名 → この VS の namespace に解決
+            port:
+              number: 80
+    - route: # デフォルト: Web UI（Streamlit の /static, /_stcore/stream を含む）
+        - destination:
+            host: ui
+            port:
+              number: 80

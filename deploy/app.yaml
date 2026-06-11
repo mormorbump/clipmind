@@ -1,0 +1,79 @@
+# ClipMind API 本体。イメージタグは k8s-action の汎用 ApplicationSet が
+# {{head_sha}} に差し替える（kustomization.yaml の images で名前を管理）。
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: clipmind
+  labels:
+    app: clipmind
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: clipmind
+  template:
+    metadata:
+      labels:
+        app: clipmind
+      annotations:
+        proxy.istio.io/config: |
+          holdApplicationUntilProxyStarts: true
+    spec:
+      initContainers:
+        # DB スキーマを起動前に適用（alembic は Settings 経由で DATABASE_URL を読む）
+        - name: migrate
+          image: us-central1-docker.pkg.dev/k8s-action-preview-26/preview/clipmind:latest
+          command: ["alembic", "upgrade", "head"]
+          env:
+            - name: DATABASE_URL
+              value: postgresql+asyncpg://clipmind:clipmind@postgres:5432/clipmind
+          resources:
+            requests:
+              cpu: 10m
+              memory: 128Mi
+      containers:
+        - name: clipmind
+          image: us-central1-docker.pkg.dev/k8s-action-preview-26/preview/clipmind:latest
+          ports:
+            - containerPort: 8000
+          env:
+            - name: QDRANT_URL
+              value: http://qdrant:6333
+            - name: REDIS_URL
+              value: redis://redis:6379/0
+            - name: DATABASE_URL
+              value: postgresql+asyncpg://clipmind:clipmind@postgres:5432/clipmind
+            # キーフレーム画像の配信パス。Streamlit UI も /static を使い同一ホストで
+            # 衝突するため、API 側は /media に逃がす（virtualservice.yaml と対）
+            - name: OBJECT_STORE_URL_PREFIX
+              value: /media
+            # LLM API キーは未設定（デフォルト空）。ヘルスチェックと
+            # 非 LLM 機能のプレビューが目的。必要になったら
+            # SealedSecret / ExternalSecret 等で注入する。
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 50m
+              memory: 256Mi
+            limits:
+              memory: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: clipmind
+  labels:
+    app: clipmind
+spec:
+  type: ClusterIP
+  selector:
+    app: clipmind
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8000

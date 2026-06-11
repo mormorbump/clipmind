@@ -27,7 +27,10 @@ def ingest_job(video_id: str, object_store_key: str) -> dict[str, object]:
     from clipmind.storage.object_store import LocalFSObjectStore
 
     settings = get_settings()
-    object_store = LocalFSObjectStore(base_dir=settings.object_store_dir)
+    object_store = LocalFSObjectStore(
+        base_dir=settings.object_store_dir,
+        public_url_prefix=settings.object_store_url_prefix,
+    )
     progress = RedisProgressPublisher(settings.redis_url)
 
     async def _run() -> dict[str, object]:
